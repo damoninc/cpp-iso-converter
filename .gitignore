@@ -6,3 +6,7 @@ obj/
 *.pdb
 *.ilk
 *.vcxproj.user
+*.iso
+*.ciso
+*.gcz
+*.wbfs

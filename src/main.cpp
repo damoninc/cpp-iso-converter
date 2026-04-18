@@ -4,7 +4,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: ciso2iso <input.cso> <output.iso>\n";
+        std::cerr << "Usage: ciso2iso <input.ciso> <output.iso>\n";
         return 1;
     }
 

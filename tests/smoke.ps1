@@ -2,11 +2,26 @@ $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $false
 
 $root = Split-Path -Parent $PSScriptRoot
-$vsDevCmd = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\Common7\Tools\VsDevCmd.bat"
-$msbuild = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe"
+if ($env:MSBUILD_EXE) {
+    & $env:MSBUILD_EXE ciso2iso.sln /p:Configuration=Release /p:Platform=x64
+}
+else {
+    $msbuildCandidates = @(@(
+        $env:MSBUILD_EXE,
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\amd64\MSBuild.exe",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional\MSBuild\Current\Bin\amd64\MSBuild.exe"
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path $_) })
 
-$buildCommand = "`"$vsDevCmd`" -arch=x64 && `"$msbuild`" ciso2iso.sln /p:Configuration=Release /p:Platform=x64"
-cmd.exe /c $buildCommand
+    if ($msbuildCandidates.Count -gt 0) {
+        & $msbuildCandidates[0] ciso2iso.sln /p:Configuration=Release /p:Platform=x64
+    }
+    else {
+        & msbuild ciso2iso.sln /p:Configuration=Release /p:Platform=x64
+    }
+}
+
 if ($LASTEXITCODE -ne 0) {
     throw "Build failed"
 }
@@ -57,7 +72,7 @@ $usageResult = Invoke-CommandCapture -FilePath $exe -Arguments @()
 if ($usageResult.ExitCode -eq 0) {
     throw "Expected usage invocation to fail"
 }
-if ($usageResult.Output -notmatch "Usage: ciso2iso <input.cso> <output.iso>") {
+if ($usageResult.Output -notmatch "Usage: ciso2iso <input.ciso> <output.iso>") {
     throw "Usage output did not match expected text"
 }
 
