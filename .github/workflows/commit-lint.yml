@@ -1,0 +1,101 @@
+name: Commit Lint Label
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label-by-commit:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select release label from first semantic commit
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          HEAD_SHA='${{ github.event.pull_request.head.sha }}'
+
+          label='chore'
+          first_semantic=''
+
+          while IFS= read -r subject; do
+            if [[ "$subject" =~ ^[[:space:]]*feat: ]]; then
+              first_semantic="$subject"
+              label='release-feature'
+              break
+            fi
+
+            if [[ "$subject" =~ ^[[:space:]]*fix: ]]; then
+              first_semantic="$subject"
+              label='release-fix'
+              break
+            fi
+
+            if [[ "$subject" =~ ^[[:space:]]*chore: ]]; then
+              first_semantic="$subject"
+              label='chore'
+              break
+            fi
+          done < <(git log --reverse --format=%s "${BASE_SHA}..${HEAD_SHA}")
+
+          if [[ -n "$first_semantic" ]]; then
+            echo "First semantic commit: $first_semantic"
+          else
+            echo 'No feat:/fix:/chore: commits found; defaulting to chore.'
+          fi
+
+          echo "label=${label}" >> "$GITHUB_OUTPUT"
+
+      - name: Apply pull request label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issue_number = context.issue.number;
+            const nextLabel = '${{ steps.classify.outputs.label }}';
+            const managedLabels = ['release-feature', 'release-fix', 'chore'];
+
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existingManaged = currentLabels
+              .map((label) => label.name)
+              .filter((name) => managedLabels.includes(name));
+
+            for (const name of existingManaged) {
+              if (name !== nextLabel) {
+                await github.rest.issues.removeLabel({ owner, repo, issue_number, name });
+              }
+            }
+
+            const hasNext = currentLabels.some((label) => label.name === nextLabel);
+            if (!hasNext) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number,
+                labels: [nextLabel],
+              });
+            }
