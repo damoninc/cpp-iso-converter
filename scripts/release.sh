@@ -87,16 +87,18 @@ release_plan() {
 create_zip() {
   local source_dir="$1"
   local destination_zip="$2"
+  local destination_abs
+  destination_abs="$(cd "$(dirname "$destination_zip")" && pwd)/$(basename "$destination_zip")"
 
   if command -v zip >/dev/null 2>&1; then
     (
       cd "$source_dir"
-      zip -r "$destination_zip" .
+      zip -r "$destination_abs" .
     ) >/dev/null
     return
   fi
 
-  python - "$source_dir" "$destination_zip" <<'PYTHON'
+  python - "$source_dir" "$destination_abs" <<'PYTHON'
 import pathlib
 import sys
 import zipfile
