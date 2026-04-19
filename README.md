@@ -26,6 +26,8 @@ Release automation runs on pushes to `master` and inspects commit subjects since
 
 When a release is needed, GitHub Actions builds both Windows (`ciso2iso.exe`) and Linux (`ciso2iso`) binaries, runs platform-appropriate checks, packages each binary with `README.md`, and uploads versioned zip assets to GitHub Releases.
 
+Additionally, pull requests targeting `master` run the same cross-platform smoke checks before merge through the `Build Validation` workflow.
+
 ## Build
 
 The repository includes a Visual Studio solution and a simple CMake build file. No third-party compression library is required for the supported GameCube CISO variant.
