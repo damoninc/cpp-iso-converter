@@ -9,7 +9,11 @@ param(
 
     [string]$ReadmePath = 'README.md',
 
-    [string]$OutputDir = 'dist'
+    [string]$OutputDir = 'dist',
+
+    [string]$BinaryName = 'ciso2iso.exe',
+
+    [string]$Target = 'windows-x64'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -111,6 +115,12 @@ function New-ReleasePackage {
     if ([string]::IsNullOrWhiteSpace($ExePath)) {
         throw 'ExePath is required for package mode.'
     }
+    if ([string]::IsNullOrWhiteSpace($BinaryName)) {
+        throw 'BinaryName is required for package mode.'
+    }
+    if ([string]::IsNullOrWhiteSpace($Target)) {
+        throw 'Target is required for package mode.'
+    }
     if (-not (Test-Path -LiteralPath $ExePath)) {
         throw "Executable not found at $ExePath"
     }
@@ -126,10 +136,10 @@ function New-ReleasePackage {
     }
     New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
 
-    Copy-Item -LiteralPath $ExePath -Destination (Join-Path $stageDir 'ciso2iso.exe')
+    Copy-Item -LiteralPath $ExePath -Destination (Join-Path $stageDir $BinaryName)
     Copy-Item -LiteralPath $ReadmePath -Destination (Join-Path $stageDir 'README.md')
 
-    $zipPath = Join-Path $OutputDir "ciso2iso-windows-x64-$Version.zip"
+    $zipPath = Join-Path $OutputDir "ciso2iso-$Target-$Version.zip"
     if (Test-Path -LiteralPath $zipPath) {
         Remove-Item -LiteralPath $zipPath -Force
     }
