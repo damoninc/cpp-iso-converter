@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   plan:
@@ -14,6 +15,7 @@ jobs:
     outputs:
       release: ${{ steps.plan.outputs.release }}
       version: ${{ steps.plan.outputs.version }}
+      release_label: ${{ steps.release-label.outputs.release_label }}
 
     steps:
       - name: Checkout
@@ -21,17 +23,46 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Determine release label from merged pull request
+        id: release-label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const sha = context.sha;
+            const managedLabels = ['release-feature', 'release-fix', 'chore'];
+
+            const { data: pulls } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: sha,
+            });
+
+            const mergedPull = pulls.find((pr) => pr.merged_at) ?? pulls[0];
+            if (!mergedPull) {
+              core.info(`No associated pull request found for ${sha}; defaulting to chore.`);
+              core.setOutput('release_label', 'chore');
+              return;
+            }
+
+            const labelNames = mergedPull.labels.map((label) => label.name);
+            const resolved = managedLabels.find((name) => labelNames.includes(name)) ?? 'chore';
+
+            core.info(`Using label '${resolved}' from PR #${mergedPull.number}.`);
+            core.setOutput('release_label', resolved);
+
       - name: Plan release
         id: plan
         shell: bash
         run: |
-          ./scripts/release.sh plan
+          ./scripts/release.sh plan --release-label '${{ steps.release-label.outputs.release_label }}'
 
       - name: Stop when no release is needed
         if: steps.plan.outputs.release != 'true'
         shell: bash
         run: |
-          echo 'No feat: or fix: commits found since the latest tag.'
+          echo "No release needed for label: ${{ steps.release-label.outputs.release_label }}"
 
   build:
     if: needs.plan.outputs.release == 'true'

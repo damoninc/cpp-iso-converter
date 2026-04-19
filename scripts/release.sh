@@ -10,6 +10,7 @@ readme_path="README.md"
 output_dir="dist"
 binary_name="ciso2iso.exe"
 target="windows-x64"
+release_label="chore"
 
 write_github_output() {
   local line="$1"
@@ -25,37 +26,25 @@ latest_version_tag() {
   git tag --list 'v*' --sort=-version:refname | head -n 1
 }
 
-commit_subjects_since_tag() {
-  local tag="$1"
-  if [[ -z "$tag" ]]; then
-    git log --format=%s
-  else
-    git log "${tag}..HEAD" --format=%s
-  fi
-}
-
-next_version() {
+next_version_from_label() {
   local current_tag="$1"
-  shift
-  local has_feat=false
-  local has_fix=false
+  local label="$2"
 
-  for subject in "$@"; do
-    if [[ "$subject" =~ ^[[:space:]]*feat: ]]; then
-      has_feat=true
-      continue
-    fi
-    if [[ "$subject" =~ ^[[:space:]]*fix: ]]; then
-      has_fix=true
-    fi
-  done
+  case "$label" in
+    release-feature|release-fix|chore)
+      ;;
+    *)
+      echo "Unsupported release label: $label" >&2
+      return 2
+      ;;
+  esac
 
-  if [[ "$has_feat" == false && "$has_fix" == false ]]; then
+  if [[ "$label" == "chore" ]]; then
     return 1
   fi
 
   if [[ -z "$current_tag" ]]; then
-    if [[ "$has_feat" == true ]]; then
+    if [[ "$label" == "release-feature" ]]; then
       printf 'v0.1.0\n'
     else
       printf 'v0.0.1\n'
@@ -72,7 +61,7 @@ next_version() {
   local minor="${BASH_REMATCH[2]}"
   local patch="${BASH_REMATCH[3]}"
 
-  if [[ "$has_feat" == true ]]; then
+  if [[ "$label" == "release-feature" ]]; then
     printf 'v%s.%s.0\n' "$major" "$((minor + 1))"
   else
     printf 'v%s.%s.%s\n' "$major" "$minor" "$((patch + 1))"
@@ -83,15 +72,15 @@ release_plan() {
   local tag
   tag="$(latest_version_tag)"
 
-  mapfile -t subjects < <(commit_subjects_since_tag "$tag")
-
   local planned
-  if ! planned="$(next_version "$tag" "${subjects[@]:-}")"; then
+  if ! planned="$(next_version_from_label "$tag" "$release_label")"; then
     write_github_output 'release=false'
+    write_github_output "release_label=$release_label"
     return 0
   fi
 
   write_github_output 'release=true'
+  write_github_output "release_label=$release_label"
   write_github_output "version=${planned}"
 }
 
@@ -171,6 +160,10 @@ while (($#)); do
       ;;
     --target)
       target="$2"
+      shift 2
+      ;;
+    --release-label)
+      release_label="$2"
       shift 2
       ;;
     *)
